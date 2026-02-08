@@ -1,0 +1,7 @@
+<resources>
+  <color name="jst_dark">#0f1115</color>
+  <color name="jst_dark_alt">#1a1d24</color>
+  <color name="jst_accent">#00b3ff</color>
+  <color name="jst_text">#ffffff</color>
+  <color name="jst_text_muted">#a0a6b2</color>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string-array name="user_agent_entries">
+    <item>@string/ua_mode_mobile</item>
+    <item>@string/ua_mode_desktop</item>
+    <item>@string/ua_mode_auto</item>
+  </string-array>
+  
+  <string-array name="user_agent_values">
+    <item>mobile</item>
+    <item>desktop</item>
+    <item>auto</item>
+  </string-array>
+</resources>

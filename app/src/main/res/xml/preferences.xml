@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto">
+
+  <EditTextPreference
+    android:key="server_url"
+    android:title="Server URL"
+    android:summary="Full http:// or https:// URL"
+    android:dialogTitle="Server URL" />
+
+  <ListPreference
+    android:key="user_agent_mode"
+    android:title="User Agent Mode"
+    android:summary="Choose browser layout type"
+    android:entries="@array/user_agent_entries"
+    android:entryValues="@array/user_agent_values"
+    android:defaultValue="mobile" />
+
+  <SwitchPreferenceCompat
+    android:key="allow_http"
+    android:title="Allow HTTP"
+    android:summary="Allow cleartext http:// connections (unsafe)"
+    android:defaultValue="true" />
+
+  <SwitchPreferenceCompat
+    android:key="allow_invalid_ssl"
+    android:title="Allow invalid SSL"
+    android:summary="Accept self-signed or invalid certificates (unsafe)"
+    android:defaultValue="false" />
+
+  <tv.firetvwebwrapper.app.DonatePreference
+    android:key="donate"
+    android:title="☕ Buy Me a Coffee"
+    android:summary="Support development (optional)" />
+
+</PreferenceScreen>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@color/jst_dark"
+  android:orientation="vertical"
+  android:padding="24dp">
+
+  <TextView
+    android:id="@+id/setup_title"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="@string/setup_title"
+    android:textColor="@color/jst_text"
+    android:textSize="24sp"
+    android:textStyle="bold" />
+
+  <TextView
+    android:id="@+id/setup_instructions"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    android:text="@string/setup_instructions"
+    android:textColor="@color/jst_text_muted"
+    android:textSize="16sp" />
+
+  <EditText
+    android:id="@+id/server_url_input"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:autofillHints="" 
+    android:hint="@string/setup_hint"
+    android:inputType="textUri"
+    android:singleLine="true"
+    android:textColor="@color/jst_text"
+    android:textColorHint="@color/jst_text_muted" />
+
+  <TextView
+    android:id="@+id/setup_example"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:text="Example: http://192.168.1.10:5055"
+    android:textColor="@color/jst_text_muted"
+    android:textSize="14sp" />
+
+  <Button
+    android:id="@+id/save_button"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="24dp"
+    android:text="@string/setup_button" />
+
+</LinearLayout>

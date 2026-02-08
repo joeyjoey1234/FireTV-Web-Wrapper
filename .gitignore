@@ -1,0 +1,33 @@
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*~
+# Android Studio
+app/build/
+!/gradle/wrapper/gradle-wrapper.jar
+
+# Signing materials (never commit secrets)
+/keystore.properties
+*.jks
+*.keystore
+*.pem
+*.p12
+*.keystore.*
+
+# Generated binaries
+*.apk
+*.apks
+*.aab
+app/release/
+app/debug/
+
+# Local-only docs
+CHANGELOG.md
+
+
+*.iml
