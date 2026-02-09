@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="app_name">FireTV Web Wrapper</string>
   <string name="setup_title">Connect to Web Interface</string>
@@ -8,8 +9,48 @@
   <string name="invalid_url">Please enter a valid http:// or https:// URL.</string>
   <string name="http_blocked">HTTP is disabled in Settings.</string>
   <string name="ssl_blocked">SSL error. Enable "Allow invalid SSL" in Settings to proceed.</string>
-  
+
   <string name="ua_mode_mobile">Mobile</string>
   <string name="ua_mode_desktop">Desktop</string>
   <string name="ua_mode_auto">Auto (Default)</string>
+
+  <string name="pref_category_home">Home experience</string>
+  <string name="pref_category_browser">Browser</string>
+  <string name="pref_category_support">Support</string>
+  <string name="pref_server_url_title">Active home URL</string>
+  <string name="pref_server_url_summary">Full http:// or https:// address for the home screen</string>
+  <string name="pref_saved_urls_title">Saved home URLs</string>
+  <string name="pref_saved_urls_summary">%1$s (%2$d total)</string>
+  <string name="pref_user_agent_title">User agent mode</string>
+  <string name="pref_user_agent_summary">Choose how the remote site sees this browser</string>
+  <string name="pref_allow_http_title">Allow HTTP</string>
+  <string name="pref_allow_http_summary">Permit insecure http:// traffic (not recommended)</string>
+  <string name="pref_allow_invalid_ssl_title">Allow invalid SSL</string>
+  <string name="pref_allow_invalid_ssl_summary">Accept self-signed or expired certificates</string>
+  <string name="pref_donate_summary">Support the project (optional)</string>
+
+  <string name="bookmark_manager_title">Saved URLs</string>
+  <string name="bookmark_add">Add URL</string>
+  <string name="bookmark_add_hint">https://example.com</string>
+  <string name="bookmark_add_message">Add bookmarks for the sites you open most.</string>
+  <string name="bookmark_invalid">That URL doesn\'t look valid.</string>
+  <string name="bookmark_added">Bookmark added.</string>
+  <string name="bookmark_deleted">Removed bookmark.</string>
+  <string name="bookmark_delete_blocked">Keep at least one bookmark.</string>
+  <string name="bookmark_home_updated">Active home updated.</string>
+  <string name="bookmark_set_home">Set as home</string>
+  <string name="bookmark_delete">Delete</string>
+  <string name="bookmark_home_indicator">Home</string>
+  <string name="bookmark_empty_list">No bookmarks yet.</string>
+
+  <string name="update_title">Check for updates</string>
+  <string name="update_summary_checking">Checking GitHub...</string>
+  <string name="update_summary_error">Couldn\'t reach GitHub.</string>
+  <string name="update_summary_available">Current %1$s - %2$s is available.</string>
+  <string name="update_summary_latest">You\'re running the latest release (%1$s).</string>
+  <string name="update_summary_downloading">Downloading %1$s...</string>
+  <string name="update_download_start">Downloading update...</string>
+  <string name="update_download_complete">Download finished, launching installer.</string>
+  <string name="update_download_failed">Download failed: %1$s</string>
+  <string name="update_permission_required">Allow installs from unknown sources to continue.</string>
 </resources>

@@ -24,14 +24,15 @@ class SetupActivity : AppCompatActivity() {
       input.setText(existing)
       input.setSelection(existing.length)
     }
+    button.isEnabled = UrlValidator.isValidWebUrl(existing)
 
     button.setOnClickListener {
-      val url = input.text.toString().trim()
-      if (!isValidUrl(url)) {
+      val url = UrlValidator.normalize(input.text?.toString())
+      if (!UrlValidator.isValidWebUrl(url)) {
         Toast.makeText(this, R.string.invalid_url, Toast.LENGTH_LONG).show()
         return@setOnClickListener
       }
-      prefs.edit().putString(Prefs.KEY_SERVER_URL, url).apply()
+      BookmarkStore.setHome(prefs, url)
       startActivity(Intent(this, MainActivity::class.java))
       finish()
     }
@@ -40,13 +41,9 @@ class SetupActivity : AppCompatActivity() {
       override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
       override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
       override fun afterTextChanged(s: Editable?) {
-        button.isEnabled = s?.toString()?.trim()?.isNotEmpty() == true
+        button.isEnabled = UrlValidator.isValidWebUrl(s?.toString())
       }
     })
   }
 
-  private fun isValidUrl(value: String): Boolean {
-    val lower = value.lowercase()
-    return lower.startsWith("http://") || lower.startsWith("https://")
-  }
 }

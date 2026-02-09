@@ -5,6 +5,8 @@ Minimal Fire TV-focused Android WebView wrapper that launches any self-hosted we
 ## Features
 - Guided server URL onboarding flow with validation and persistence
 - Settings screen for HTTP/HTTPS toggles, user-agent switching (Mobile, Desktop, Auto), and SSL allowances
+- Multi-home bookmark manager to store multiple server URLs and pick the active home screen on the fly
+- Built-in GitHub release update checker with on-device APK download + installer handoff
 - Enhanced TV navigation helpers (focus outlines, spatial navigation, modal trapping, click dispatch fixes)
 - Back-stack protection so login pages are not revisited accidentally
 - Optional debug-only WebView inspection
@@ -28,7 +30,14 @@ README.md                This document
 
 ## Local setup
 1. Clone the repository.
-2. Copy `keystore.properties.example` to `keystore.properties` (kept out of Git) and fill it with your keystore details if you plan to ship a signed release. Skip this step for debug builds.
+2. Copy `keystore.properties.example` to `keystore.properties` (kept out of Git) and point it at your release keystore. The alias **must** be `joepe-na-signer` so it matches the signing config baked into the app. Example:
+   ```properties
+   storeFile=/absolute/path/to/firetv-release.jks
+   storePassword=***
+   keyAlias=joepe-na-signer
+   keyPassword=***
+   ```
+   Skip this step for debug builds.
 3. Run `./gradlew tasks` once to download the wrapper dependencies.
 
 ## Building
@@ -40,27 +49,34 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### Release build (for GitHub downloads)
 ```bash
-./gradlew assembleRelease
+./gradlew clean assembleRelease
 ```
-If `keystore.properties` is present, the release APK is signed automatically. Otherwise Gradle will emit `app-release-unsigned.apk` that you must sign manually:
+With `keystore.properties` present the APK is signed automatically at `app/build/outputs/apk/release/app-release.apk`. Rename and checksum it before uploading so users can validate the download:
 ```bash
-${'$'}ANDROID_SDK_ROOT/build-tools/<version>/apksigner sign \
-  --ks my-release-key.jks \
-  --out app-release-signed.apk \
-  app/build/outputs/apk/release/app-release-unsigned.apk
+cp app/build/outputs/apk/release/app-release.apk firetv-web-wrapper-1.0.0.apk
+sha256sum firetv-web-wrapper-1.0.0.apk
 ```
-Rename the signed artifact (e.g., `firetv-web-wrapper-1.0.0.apk`) before uploading.
+If you skip `keystore.properties` Gradle emits `app-release-unsigned.apk`; sign it manually with `apksigner` before distribution.
 
 ## Publishing the first GitHub release
-1. Ensure `./gradlew assembleRelease` succeeds and produce a signed APK as described above.
-2. Create a Git tag that matches the app `versionName` (currently `v1.0.0`).
-3. Draft a GitHub release for that tag and attach the signed APK so users can download it without cloning the repo.
-4. Repeat these steps for future versions—no additional files need to be committed besides the source and Gradle wrapper.
+1. Confirm `./gradlew clean assembleRelease` succeeds, rename the APK to `firetv-web-wrapper-1.0.0.apk`, and note the SHA-256 hash.
+2. Tag the commit that contains the release build: `git tag v1.0.0 -m "FireTV Web Wrapper 1.0.0" && git push origin v1.0.0`.
+3. Push the branch if you have not already: `git push origin main`.
+4. Create the GitHub release, attach the renamed APK, and include the checksum in the release notes. Example using the GitHub CLI:
+   ```bash
+   gh release create v1.0.0 firetv-web-wrapper-1.0.0.apk \
+     --title "FireTV Web Wrapper 1.0.0" \
+     --notes "- First public release\n- Multi-home bookmark launcher\n- Built-in GitHub updater"
+   ```
+5. The in-app updater fetches `https://api.github.com/repos/joeyjoey1234/FireTV-Web-Wrapper/releases/latest`. If you host the code under a different owner or repo name, update the constants in `UpdateApi.kt` accordingly before tagging.
+6. Repeat these steps for future versions and increment `versionCode`/`versionName` in `app/build.gradle.kts` as needed.
 
 ## Configuration quick reference
 - Server URL: stored under `Prefs.KEY_SERVER_URL` and editable from the Settings screen.
+- Saved home URLs / bookmarks: managed by `BookmarkStore` with JSON stored under `Prefs.KEY_BOOKMARKS`. The Settings shortcut opens the bookmark manager activity.
 - Allow HTTP / invalid SSL: toggles exposed in Settings for environments that rely on self-signed certs.
 - User-agent modes: Auto (default), Mobile, Desktop. Changing the mode triggers a WebView reload.
+- Update checks: `Settings > Support > Check for updates` hits the GitHub Releases API and downloads the latest APK when a newer `versionName` is published.
 
 ## Application ID
 `tv.firetvwebwrapper.app`

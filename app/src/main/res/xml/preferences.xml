@@ -2,35 +2,58 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:app="http://schemas.android.com/apk/res-auto">
 
-  <EditTextPreference
-    android:key="server_url"
-    android:title="Server URL"
-    android:summary="Full http:// or https:// URL"
-    android:dialogTitle="Server URL" />
+  <PreferenceCategory
+    app:title="@string/pref_category_home">
 
-  <ListPreference
-    android:key="user_agent_mode"
-    android:title="User Agent Mode"
-    android:summary="Choose browser layout type"
-    android:entries="@array/user_agent_entries"
-    android:entryValues="@array/user_agent_values"
-    android:defaultValue="mobile" />
+    <EditTextPreference
+      android:key="server_url"
+      android:title="@string/pref_server_url_title"
+      android:summary="@string/pref_server_url_summary"
+      android:dialogTitle="@string/pref_server_url_title" />
 
-  <SwitchPreferenceCompat
-    android:key="allow_http"
-    android:title="Allow HTTP"
-    android:summary="Allow cleartext http:// connections (unsafe)"
-    android:defaultValue="true" />
+    <Preference
+      android:key="manage_bookmarks"
+      android:title="@string/pref_saved_urls_title"
+      android:summary="@string/bookmark_empty_list" />
+  </PreferenceCategory>
 
-  <SwitchPreferenceCompat
-    android:key="allow_invalid_ssl"
-    android:title="Allow invalid SSL"
-    android:summary="Accept self-signed or invalid certificates (unsafe)"
-    android:defaultValue="false" />
+  <PreferenceCategory
+    app:title="@string/pref_category_browser">
 
-  <tv.firetvwebwrapper.app.DonatePreference
-    android:key="donate"
-    android:title="☕ Buy Me a Coffee"
-    android:summary="Support development (optional)" />
+    <ListPreference
+      android:key="user_agent_mode"
+      android:title="@string/pref_user_agent_title"
+      android:summary="@string/pref_user_agent_summary"
+      android:entries="@array/user_agent_entries"
+      android:entryValues="@array/user_agent_values"
+      android:defaultValue="mobile" />
+
+    <SwitchPreferenceCompat
+      android:key="allow_http"
+      android:title="@string/pref_allow_http_title"
+      android:summary="@string/pref_allow_http_summary"
+      android:defaultValue="true" />
+
+    <SwitchPreferenceCompat
+      android:key="allow_invalid_ssl"
+      android:title="@string/pref_allow_invalid_ssl_title"
+      android:summary="@string/pref_allow_invalid_ssl_summary"
+      android:defaultValue="false" />
+  </PreferenceCategory>
+
+  <PreferenceCategory
+    app:title="@string/pref_category_support">
+
+    <Preference
+      android:key="check_update"
+      android:title="@string/update_title"
+      android:summary="@string/update_summary_checking"
+      android:enabled="false" />
+
+    <tv.firetvwebwrapper.app.DonatePreference
+      android:key="donate"
+      android:title="☕ Buy Me a Coffee"
+      android:summary="@string/pref_donate_summary" />
+  </PreferenceCategory>
 
 </PreferenceScreen>
