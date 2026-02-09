@@ -15,7 +15,7 @@
 - `.gitignore` already excludes build outputs, IDE metadata, keystore files, and APK/AAB artifacts. Keep only the minimal source/Gradle wrapper files in version control, as requested by the user.
 
 ## Release Publishing
-- Current versionName/versionCode: `1.0.0` / `1`. Update these in `app/build.gradle.kts` before tagging future releases.
+- Current versionName/versionCode: `1.1.0` / `2`. Update these in `app/build.gradle.kts` before tagging future releases.
 - Run `./gradlew clean assembleRelease`, then copy `app/build/outputs/apk/release/app-release.apk` to `firetv-web-wrapper-<version>.apk` and capture `sha256sum` for the release notes.
-- Tag the build commit (`git tag v1.0.0 && git push origin v1.0.0`), push `main`, and create the GitHub release attaching the renamed APK + checksum.
+- Tag the build commit (`git tag v1.1.0 && git push origin v1.1.0`), push `main`, and create the GitHub release attaching the renamed APK + checksum.
 - The in-app updater expects releases to live at `joeyjoey1234/FireTV-Web-Wrapper`. Adjust `UpdateApi.kt` if the repository slug changes.

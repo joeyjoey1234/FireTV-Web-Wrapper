@@ -51,22 +51,22 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```bash
 ./gradlew clean assembleRelease
 ```
-With `keystore.properties` present the APK is signed automatically at `app/build/outputs/apk/release/app-release.apk`. Rename and checksum it before uploading so users can validate the download:
+With `keystore.properties` present the APK is signed automatically at `app/build/outputs/apk/release/app-release.apk`. Rename and checksum it before uploading so users can validate the download (swap `1.1.0` for whatever `versionName` you're shipping):
 ```bash
-cp app/build/outputs/apk/release/app-release.apk firetv-web-wrapper-1.0.0.apk
-sha256sum firetv-web-wrapper-1.0.0.apk
+cp app/build/outputs/apk/release/app-release.apk firetv-web-wrapper-1.1.0.apk
+sha256sum firetv-web-wrapper-1.1.0.apk
 ```
 If you skip `keystore.properties` Gradle emits `app-release-unsigned.apk`; sign it manually with `apksigner` before distribution.
 
-## Publishing the first GitHub release
-1. Confirm `./gradlew clean assembleRelease` succeeds, rename the APK to `firetv-web-wrapper-1.0.0.apk`, and note the SHA-256 hash.
-2. Tag the commit that contains the release build: `git tag v1.0.0 -m "FireTV Web Wrapper 1.0.0" && git push origin v1.0.0`.
+## Publishing GitHub releases
+1. Confirm `./gradlew clean assembleRelease` succeeds, rename the APK to `firetv-web-wrapper-1.1.0.apk` (match the `versionName`), and capture the SHA-256 hash.
+2. Tag the commit that contains the release build: `git tag v1.1.0 -m "FireTV Web Wrapper 1.1.0" && git push origin v1.1.0`.
 3. Push the branch if you have not already: `git push origin main`.
 4. Create the GitHub release, attach the renamed APK, and include the checksum in the release notes. Example using the GitHub CLI:
    ```bash
-   gh release create v1.0.0 firetv-web-wrapper-1.0.0.apk \
-     --title "FireTV Web Wrapper 1.0.0" \
-     --notes "- First public release\n- Multi-home bookmark launcher\n- Built-in GitHub updater"
+   gh release create v1.1.0 firetv-web-wrapper-1.1.0.apk \
+     --title "FireTV Web Wrapper 1.1.0" \
+     --notes "- Multi-home bookmark workflow\n- GitHub-powered in-app updater\n- Navigation & focus polish"
    ```
 5. The in-app updater fetches `https://api.github.com/repos/joeyjoey1234/FireTV-Web-Wrapper/releases/latest`. If you host the code under a different owner or repo name, update the constants in `UpdateApi.kt` accordingly before tagging.
 6. Repeat these steps for future versions and increment `versionCode`/`versionName` in `app/build.gradle.kts` as needed.
