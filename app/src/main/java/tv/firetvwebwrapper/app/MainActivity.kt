@@ -324,6 +324,7 @@ class MainActivity : AppCompatActivity() {
           }
 
           var clickTracker = { element: null, count: 0, timer: null };
+          var suppressSyntheticKeyHandling = false;
           var focusSelector = '[tabindex], a, button, input, textarea, select, [role="button"], [role="link"], [role="checkbox"], [role="switch"], [role="slider"], [aria-checked], [onclick]';
 
           function isVisible(el) {
@@ -548,26 +549,31 @@ class MainActivity : AppCompatActivity() {
               { key: ' ', code: 'Space', keyCode: 32, which: 32 },
               { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }
             ];
-            for (var i = 0; i < keyDefs.length; i++) {
-              var keyDef = keyDefs[i];
-              var down = new KeyboardEvent('keydown', {
-                key: keyDef.key,
-                code: keyDef.code,
-                keyCode: keyDef.keyCode,
-                which: keyDef.which,
-                bubbles: true,
-                cancelable: true
-              });
-              var up = new KeyboardEvent('keyup', {
-                key: keyDef.key,
-                code: keyDef.code,
-                keyCode: keyDef.keyCode,
-                which: keyDef.which,
-                bubbles: true,
-                cancelable: true
-              });
-              target.dispatchEvent(down);
-              target.dispatchEvent(up);
+            suppressSyntheticKeyHandling = true;
+            try {
+              for (var i = 0; i < keyDefs.length; i++) {
+                var keyDef = keyDefs[i];
+                var down = new KeyboardEvent('keydown', {
+                  key: keyDef.key,
+                  code: keyDef.code,
+                  keyCode: keyDef.keyCode,
+                  which: keyDef.which,
+                  bubbles: true,
+                  cancelable: true
+                });
+                var up = new KeyboardEvent('keyup', {
+                  key: keyDef.key,
+                  code: keyDef.code,
+                  keyCode: keyDef.keyCode,
+                  which: keyDef.which,
+                  bubbles: true,
+                  cancelable: true
+                });
+                target.dispatchEvent(down);
+                target.dispatchEvent(up);
+              }
+            } finally {
+              suppressSyntheticKeyHandling = false;
             }
           }
 
@@ -650,6 +656,10 @@ class MainActivity : AppCompatActivity() {
           }
 
           function onKeyDown(e) {
+            if (suppressSyntheticKeyHandling || e.isTrusted === false) {
+              return;
+            }
+
             if (isTextInput(document.activeElement) && 
                 (e.key !== 'Enter' && e.key !== 'Escape')) {
               return;
