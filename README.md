@@ -59,17 +59,33 @@ sha256sum firetv-web-wrapper-1.1.0.apk
 If you skip `keystore.properties` Gradle emits `app-release-unsigned.apk`; sign it manually with `apksigner` before distribution.
 
 ## Publishing GitHub releases
-1. Confirm `./gradlew clean assembleRelease` succeeds, rename the APK to `firetv-web-wrapper-1.1.0.apk` (match the `versionName`), and capture the SHA-256 hash.
-2. Tag the commit that contains the release build: `git tag v1.1.0 -m "FireTV Web Wrapper 1.1.0" && git push origin v1.1.0`.
-3. Push the branch if you have not already: `git push origin main`.
-4. Create the GitHub release, attach the renamed APK, and include the checksum in the release notes. Example using the GitHub CLI:
-   ```bash
-   gh release create v1.1.0 firetv-web-wrapper-1.1.0.apk \
-     --title "FireTV Web Wrapper 1.1.0" \
-     --notes "- Multi-home bookmark workflow\n- GitHub-powered in-app updater\n- Navigation & focus polish"
-   ```
-5. The in-app updater fetches `https://api.github.com/repos/joeyjoey1234/FireTV-Web-Wrapper/releases/latest`. If you host the code under a different owner or repo name, update the constants in `UpdateApi.kt` accordingly before tagging.
-6. Repeat these steps for future versions and increment `versionCode`/`versionName` in `app/build.gradle.kts` as needed.
+### Automated (recommended)
+This repository includes `.github/workflows/release.yml`, which publishes a release automatically when you push a semver tag like `v1.1.2`.
+
+It uses GitHub Actions' built-in `GITHUB_TOKEN` for release API access (no PAT required).
+
+Required repository secrets:
+- `RELEASE_KEYSTORE_BASE64` (base64-encoded JKS file)
+- `RELEASE_STORE_PASSWORD`
+- `RELEASE_KEY_PASSWORD`
+
+The workflow enforces:
+- tag `vX.Y.Z` matches `versionName` in `app/build.gradle.kts`
+- signed `assembleRelease` build
+- release asset upload (`firetv-web-wrapper-<version>.apk`)
+- checksum upload (`firetv-web-wrapper-<version>.apk.sha256`)
+
+Release flow:
+1. Update `versionCode` and `versionName` in `app/build.gradle.kts`.
+2. Commit and push `main`.
+3. Create and push tag (example): `git tag v1.1.2 && git push origin v1.1.2`.
+
+### Manual fallback
+1. Confirm `./gradlew clean assembleRelease` succeeds, rename the APK to match `versionName`, and capture SHA-256.
+2. Push branch and tag.
+3. Create GitHub release and upload APK plus checksum.
+
+The in-app updater fetches `https://api.github.com/repos/joeyjoey1234/FireTV-Web-Wrapper/releases/latest`. If the repository owner/name changes, update `UpdateApi.kt`.
 
 ## Configuration quick reference
 - Server URL: stored under `Prefs.KEY_SERVER_URL` and editable from the Settings screen.

@@ -1,0 +1,108 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Prepare release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          APP_VERSION="$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts | head -n1)"
+          if [ -z "$APP_VERSION" ]; then
+            echo "::error::Unable to read versionName from app/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$VERSION" != "$APP_VERSION" ]; then
+            echo "::error::Tag version ($VERSION) does not match app versionName ($APP_VERSION)"
+            exit 1
+          fi
+          APK_NAME="firetv-web-wrapper-${VERSION}.apk"
+          CHECKSUM_FILE="${APK_NAME}.sha256"
+          {
+            echo "version=$VERSION"
+            echo "apk_name=$APK_NAME"
+            echo "checksum_file=$CHECKSUM_FILE"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Generate keystore.properties
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > release-signing.jks
+          cat > keystore.properties <<EOF
+          storeFile=release-signing.jks
+          storePassword=${RELEASE_STORE_PASSWORD}
+          keyAlias=joepe-na-signer
+          keyPassword=${RELEASE_KEY_PASSWORD}
+          EOF
+
+      - name: Build release APK
+        shell: bash
+        run: ./gradlew clean assembleRelease
+
+      - name: Prepare artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp app/build/outputs/apk/release/app-release.apk "${{ steps.meta.outputs.apk_name }}"
+          sha256sum "${{ steps.meta.outputs.apk_name }}" > "${{ steps.meta.outputs.checksum_file }}"
+          HASH="$(awk '{print $1}' "${{ steps.meta.outputs.checksum_file }}")"
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: FireTV Web Wrapper ${{ steps.meta.outputs.version }}
+          body: |
+            SHA-256: ${{ steps.artifacts.outputs.hash }}
+          files: |
+            ${{ steps.meta.outputs.apk_name }}
+            ${{ steps.meta.outputs.checksum_file }}
