@@ -986,49 +986,137 @@ class MainActivity : AppCompatActivity() {
             }));
           }
 
+          function pushUnique(list, el) {
+            if (!el) return;
+            if (list.indexOf(el) === -1) {
+              list.push(el);
+            }
+          }
+
+          function buildActivationTargets(seed) {
+            var targets = [];
+            if (!seed) return targets;
+
+            var resolved = resolveClickTarget(seed) || seed;
+            var semantic = getSemanticToggleTarget(resolved);
+            pushUnique(targets, semantic);
+            pushUnique(targets, resolved);
+            pushUnique(targets, seed);
+
+            var cell = semantic && semantic.closest ? semantic.closest('td,th') : null;
+            if (cell) {
+              pushUnique(targets, cell.querySelector ? cell.querySelector('[role="checkbox"], [role="switch"], [aria-checked], button, [onclick]') : null);
+              pushUnique(targets, cell);
+            }
+
+            var row = semantic && semantic.closest ? semantic.closest('tr') : null;
+            if (row) {
+              pushUnique(targets, row.querySelector ? row.querySelector('[role="checkbox"], [role="switch"], [aria-checked], button, [onclick]') : null);
+              pushUnique(targets, row);
+            }
+
+            var topModal = getTopModal();
+            if (topModal) {
+              pushUnique(targets, topModal.querySelector('tbody [role="checkbox"][tabindex], tbody [role="switch"][tabindex], tbody [aria-checked][tabindex]'));
+            }
+
+            var hitRectEl = semantic || resolved;
+            if (hitRectEl && hitRectEl.getBoundingClientRect) {
+              var rect = hitRectEl.getBoundingClientRect();
+              var cx = rect.left + rect.width / 2;
+              var cy = rect.top + rect.height / 2;
+              var pointEl = document.elementFromPoint(cx, cy);
+              pushUnique(targets, pointEl);
+              if (pointEl && pointEl.closest) {
+                pushUnique(targets, pointEl.closest('[role="checkbox"], [role="switch"], [aria-checked], td, th, tr, button'));
+              }
+            }
+
+            var filtered = [];
+            for (var i = 0; i < targets.length; i++) {
+              var target = targets[i];
+              if (!target) continue;
+              if (target.hasAttribute && target.hasAttribute('disabled')) continue;
+              if (target.getAttribute && target.getAttribute('aria-hidden') === 'true') continue;
+              if (!isVisible(target)) continue;
+              filtered.push(target);
+            }
+            return filtered;
+          }
+
+          function tryActivateTarget(target, clickDetail, rootBeforeState, rootSemanticTarget) {
+            var semanticTarget = getSemanticToggleTarget(target);
+            var localBeforeState = readToggleState(semanticTarget);
+            var beforeState = localBeforeState !== null ? localBeforeState : rootBeforeState;
+
+            if (tryNativeFormActivation(target)) {
+              var afterNativeState = readToggleState(semanticTarget);
+              if (beforeState !== null && afterNativeState !== null && afterNativeState !== beforeState) {
+                return true;
+              }
+            }
+
+            if (beforeState !== null) {
+              dispatchKeyboardActivation(target);
+              var afterKeyState = readToggleState(semanticTarget);
+              if (afterKeyState !== null && afterKeyState !== beforeState) {
+                return true;
+              }
+            }
+
+            dispatchPointerSequence(target);
+            if (typeof target.click === 'function') {
+              target.click();
+            } else {
+              var clickEvent = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
+                cancelable: true,
+                detail: clickDetail
+              });
+              target.dispatchEvent(clickEvent);
+            }
+
+            var afterClickState = readToggleState(semanticTarget);
+            if (beforeState !== null && afterClickState !== null && afterClickState !== beforeState) {
+              return true;
+            }
+
+            if (beforeState !== null && afterClickState !== null && afterClickState === beforeState) {
+              dispatchDragToggle(target);
+              var afterDragState = readToggleState(semanticTarget);
+              if (afterDragState !== null && afterDragState !== beforeState) {
+                return true;
+              }
+            }
+
+            if (rootBeforeState !== null && rootSemanticTarget) {
+              var rootAfterState = readToggleState(rootSemanticTarget);
+              if (rootAfterState !== null && rootAfterState !== rootBeforeState) {
+                return true;
+              }
+            }
+            return false;
+          }
+
           function dispatchClick(el, clickCount) {
-            var target = resolveClickTarget(el);
-            if (!target || target.hasAttribute('disabled')) return;
+            var seed = resolveClickTarget(el) || el;
+            if (!seed || (seed.hasAttribute && seed.hasAttribute('disabled'))) return;
+            var rootSemanticTarget = getSemanticToggleTarget(seed);
+            var rootBeforeState = readToggleState(rootSemanticTarget);
 
             for (var i = 0; i < clickCount; i++) {
-              var beforeState = readToggleState(target);
-              if (tryNativeFormActivation(target)) {
-                var afterNativeState = readToggleState(target);
-                if (beforeState !== null && afterNativeState !== null && afterNativeState !== beforeState) {
-                  return;
+              var targets = buildActivationTargets(seed);
+              if (!targets.length) {
+                targets = [seed];
+              }
+
+              for (var j = 0; j < targets.length; j++) {
+                var target = targets[j];
+                if (target.focus) {
+                  target.focus();
                 }
-              }
-
-              if (beforeState !== null) {
-                dispatchKeyboardActivation(target);
-                var afterKeyState = readToggleState(target);
-                if (afterKeyState !== null && afterKeyState !== beforeState) {
-                  return;
-                }
-              }
-
-              dispatchPointerSequence(target);
-              if (typeof target.click === 'function') {
-                target.click();
-              } else {
-                var clickEvent = new MouseEvent('click', {
-                  view: window,
-                  bubbles: true,
-                  cancelable: true,
-                  detail: i + 1
-                });
-                target.dispatchEvent(clickEvent);
-              }
-
-              var afterClickState = readToggleState(target);
-              if (beforeState !== null && afterClickState !== null && afterClickState !== beforeState) {
-                return;
-              }
-
-              if (beforeState !== null && afterClickState !== null && afterClickState === beforeState) {
-                dispatchDragToggle(target);
-                var afterDragState = readToggleState(target);
-                if (afterDragState !== null && afterDragState !== beforeState) {
+                if (tryActivateTarget(target, i + 1, rootBeforeState, rootSemanticTarget)) {
                   return;
                 }
               }
@@ -1038,10 +1126,24 @@ class MainActivity : AppCompatActivity() {
           function getActivationTarget() {
             var active = document.activeElement;
             if (active && active !== document.body) {
+              var activeRowCheckbox = active.closest ? active.closest('tr') : null;
+              if (activeRowCheckbox && activeRowCheckbox.querySelector) {
+                var rowCheckbox = activeRowCheckbox.querySelector('[role="checkbox"][tabindex], [role="switch"][tabindex], [aria-checked][tabindex]');
+                if (rowCheckbox) return rowCheckbox;
+              }
+              var activeCell = active.closest ? active.closest('td,th') : null;
+              if (activeCell && activeCell.querySelector) {
+                var cellCheckbox = activeCell.querySelector('[role="checkbox"][tabindex], [role="switch"][tabindex], [aria-checked][tabindex]');
+                if (cellCheckbox) return cellCheckbox;
+              }
               return active;
             }
             var topModal = getTopModal();
             var searchRoot = topModal || document;
+            if (topModal) {
+              var seasonCheckbox = topModal.querySelector('tbody [role="checkbox"][tabindex], tbody [role="switch"][tabindex], tbody [aria-checked][tabindex]');
+              if (seasonCheckbox) return seasonCheckbox;
+            }
             return searchRoot.querySelector('[role="checkbox"][tabindex], [role="switch"][tabindex], [role="slider"][tabindex], button, a[href], input, textarea, select, [tabindex]');
           }
 
@@ -1094,27 +1196,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             var semanticTarget = getSemanticToggleTarget(target);
-
             var beforeState = readToggleState(semanticTarget);
-
-            if (tryNativeFormActivation(semanticTarget)) {
-              var afterNativeState = readToggleState(semanticTarget);
-              if (beforeState !== null && afterNativeState !== null && afterNativeState !== beforeState) {
-                return true;
-              }
-            }
-
-            dispatchKeyboardActivation(semanticTarget);
-            dispatchPointerSequence(semanticTarget);
-            if (typeof semanticTarget.click === 'function') {
-              semanticTarget.click();
-            }
-
+            dispatchClick(target, 1);
             var afterState = readToggleState(semanticTarget);
-            if (beforeState !== null && afterState === beforeState) {
-              dispatchDragToggle(semanticTarget);
-              afterState = readToggleState(semanticTarget);
-            }
 
             if (beforeState !== null && afterState === beforeState &&
                 semanticTarget.getAttribute && semanticTarget.getAttribute('aria-checked') !== null) {
