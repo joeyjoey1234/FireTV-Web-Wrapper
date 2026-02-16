@@ -4,7 +4,10 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
@@ -26,6 +29,14 @@ class MainActivity : AppCompatActivity() {
   private var lastLoadedRoot: String? = null
   private var lastUserAgentMode: String? = null
   private val navigationHistory = mutableListOf<String>()
+  private var remoteActivationInProgress = false
+
+  private data class ActivationTargetInfo(
+    val x: Double,
+    val y: Double,
+    val dpr: Double,
+    val toggleState: String?
+  )
 
   @SuppressLint("SetJavaScriptEnabled")
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -267,40 +278,63 @@ class MainActivity : AppCompatActivity() {
   }
 
   private fun activateFocusedElementInWebView() {
+    if (remoteActivationInProgress) return
+    remoteActivationInProgress = true
+    webView.requestFocus()
+
+    readActivationTargetInfo outer@{ info ->
+      if (info == null || info.toggleState == null) {
+        runJsActivateFocused {
+          remoteActivationInProgress = false
+        }
+        return@outer
+      }
+
+      dispatchNativeKeyToWebView(KeyEvent.KEYCODE_SPACE)
+      webView.postDelayed({
+        readActivationTargetInfo afterSpaceCb@{ afterSpace ->
+          if (didToggleStateChange(info, afterSpace)) {
+            remoteActivationInProgress = false
+            return@afterSpaceCb
+          }
+
+          dispatchNativeTapToWebView(info)
+          webView.postDelayed({
+            readActivationTargetInfo afterTapCb@{ afterTap ->
+              if (didToggleStateChange(info, afterTap)) {
+                remoteActivationInProgress = false
+                return@afterTapCb
+              }
+
+              forceToggleFocusedControlInWebView {
+                remoteActivationInProgress = false
+              }
+            }
+          }, 80)
+        }
+      }, 80)
+    }
+  }
+
+  private fun runJsActivateFocused(onComplete: (() -> Unit)? = null) {
     val script = """
       (function() {
         try {
           if (window.__jstvActivateFocused && window.__jstvActivateFocused()) {
-            return;
+            return true;
           }
-          var el = document.activeElement;
-          if (!el || el === document.body) {
-            el = document.querySelector('[role="checkbox"][tabindex], [role="switch"][tabindex], [role="slider"][tabindex], button, a[href], input, select, textarea, [tabindex]');
-          }
-          if (!el) return;
-          if (typeof el.focus === 'function') {
-            el.focus();
-          }
-          if (typeof PointerEvent !== 'undefined') {
-            el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
-            el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
-          }
-          el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-          el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-          if (typeof el.click === 'function') {
-            el.click();
-          } else {
-            el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
-          }
+          return false;
         } catch (e) {
-          // no-op
+          return false;
         }
       })();
     """.trimIndent()
-    webView.evaluateJavascript(script, null)
+    webView.evaluateJavascript(script) {
+      onComplete?.invoke()
+    }
   }
 
-  private fun forceToggleFocusedControlInWebView() {
+  private fun forceToggleFocusedControlInWebView(onComplete: (() -> Unit)? = null) {
     val script = """
       (function() {
         try {
@@ -316,7 +350,79 @@ class MainActivity : AppCompatActivity() {
         }
       })();
     """.trimIndent()
-    webView.evaluateJavascript(script, null)
+    webView.evaluateJavascript(script) {
+      onComplete?.invoke()
+    }
+  }
+
+  private fun readActivationTargetInfo(onResult: (ActivationTargetInfo?) -> Unit) {
+    val script = """
+      (function() {
+        try {
+          if (!window.__jstvGetActivationInfo) return null;
+          return window.__jstvGetActivationInfo();
+        } catch (e) {
+          return null;
+        }
+      })();
+    """.trimIndent()
+
+    webView.evaluateJavascript(script) { raw ->
+      val value = raw?.trim()
+      if (value.isNullOrEmpty() || value == "null" || value == "\"null\"") {
+        onResult(null)
+        return@evaluateJavascript
+      }
+
+      try {
+        val obj = JSONObject(value)
+        val x = obj.optDouble("x", Double.NaN)
+        val y = obj.optDouble("y", Double.NaN)
+        if (!x.isFinite() || !y.isFinite()) {
+          onResult(null)
+          return@evaluateJavascript
+        }
+        val dpr = obj.optDouble("dpr", 1.0).let { if (it.isFinite() && it > 0) it else 1.0 }
+        val state = obj.optString("state", "").takeIf { it == "true" || it == "false" }
+        onResult(ActivationTargetInfo(x = x, y = y, dpr = dpr, toggleState = state))
+      } catch (_: Exception) {
+        onResult(null)
+      }
+    }
+  }
+
+  private fun dispatchNativeKeyToWebView(keyCode: Int) {
+    val downTime = SystemClock.uptimeMillis()
+    val down = KeyEvent(downTime, downTime, KeyEvent.ACTION_DOWN, keyCode, 0)
+    val up = KeyEvent(downTime, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, keyCode, 0)
+    webView.dispatchKeyEvent(down)
+    webView.dispatchKeyEvent(up)
+  }
+
+  private fun dispatchNativeTapToWebView(info: ActivationTargetInfo) {
+    if (webView.width <= 0 || webView.height <= 0) return
+
+    val maxX = (webView.width - 1).coerceAtLeast(1).toFloat()
+    val maxY = (webView.height - 1).coerceAtLeast(1).toFloat()
+    val x = (info.x * info.dpr).toFloat().coerceIn(1f, maxX)
+    val y = (info.y * info.dpr).toFloat().coerceIn(1f, maxY)
+
+    val downTime = SystemClock.uptimeMillis()
+    val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
+    val up = MotionEvent.obtain(downTime, downTime + 40L, MotionEvent.ACTION_UP, x, y, 0)
+    down.source = InputDevice.SOURCE_TOUCHSCREEN
+    up.source = InputDevice.SOURCE_TOUCHSCREEN
+
+    webView.dispatchTouchEvent(down)
+    webView.dispatchTouchEvent(up)
+    down.recycle()
+    up.recycle()
+  }
+
+  private fun didToggleStateChange(before: ActivationTargetInfo, after: ActivationTargetInfo?): Boolean {
+    val beforeState = before.toggleState ?: return false
+    val afterState = after?.toggleState ?: return false
+    return beforeState != afterState
   }
 
   private fun injectTvHelpers(view: WebView) {
@@ -837,6 +943,37 @@ class MainActivity : AppCompatActivity() {
             return searchRoot.querySelector('[role="checkbox"][tabindex], [role="switch"][tabindex], [role="slider"][tabindex], button, a[href], input, textarea, select, [tabindex]');
           }
 
+          function getSemanticToggleTarget(target) {
+            var semanticTarget = resolveClickTarget(target) || target;
+            if (!(semanticTarget.getAttribute && semanticTarget.getAttribute('aria-checked') !== null)) {
+              var candidate = (semanticTarget.closest && semanticTarget.closest('[role="checkbox"], [role="switch"], [aria-checked]')) ||
+                (semanticTarget.querySelector && semanticTarget.querySelector('[role="checkbox"], [role="switch"], [aria-checked]'));
+              if (candidate) {
+                semanticTarget = candidate;
+              }
+            }
+            return semanticTarget;
+          }
+
+          window.__jstvGetActivationInfo = function() {
+            var target = getActivationTarget();
+            if (!target) return null;
+            if (target.focus) target.focus();
+
+            var clickTarget = resolveClickTarget(target) || target;
+            var rect = clickTarget.getBoundingClientRect ? clickTarget.getBoundingClientRect() : null;
+            if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+
+            var semanticTarget = getSemanticToggleTarget(target);
+            var state = readToggleState(semanticTarget);
+            return {
+              x: Math.round(rect.left + rect.width / 2),
+              y: Math.round(rect.top + rect.height / 2),
+              dpr: window.devicePixelRatio || 1,
+              state: state
+            };
+          };
+
           window.__jstvActivateFocused = function() {
             var target = getActivationTarget();
             if (!target) return false;
@@ -854,15 +991,7 @@ class MainActivity : AppCompatActivity() {
               target.focus();
             }
 
-            var toggleTarget = resolveClickTarget(target) || target;
-            var semanticTarget = toggleTarget;
-            if (!(semanticTarget.getAttribute && semanticTarget.getAttribute('aria-checked') !== null)) {
-              var candidate = (semanticTarget.closest && semanticTarget.closest('[role="checkbox"], [role="switch"], [aria-checked]')) ||
-                (semanticTarget.querySelector && semanticTarget.querySelector('[role="checkbox"], [role="switch"], [aria-checked]'));
-              if (candidate) {
-                semanticTarget = candidate;
-              }
-            }
+            var semanticTarget = getSemanticToggleTarget(target);
 
             var beforeState = readToggleState(semanticTarget);
 
