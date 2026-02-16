@@ -316,25 +316,42 @@ class MainActivity : AppCompatActivity() {
           return@afterSpaceCb
         }
 
-        dispatchNativeTapToWebView(info)
+        dispatchNativeTapToWebView(info, useScaledCoordinates = false)
         webView.postDelayed({
-          readActivationTargetInfo afterTapCb@{ afterTap ->
-            if (didToggleStateChange(info, afterTap)) {
+          readActivationTargetInfo afterRawTapCb@{ afterRawTap ->
+            if (didToggleStateChange(info, afterRawTap)) {
               remoteActivationInProgress = false
-              return@afterTapCb
+              return@afterRawTapCb
+            }
+
+            if (info.dpr > 1.01) {
+              dispatchNativeTapToWebView(info, useScaledCoordinates = true)
+              webView.postDelayed({
+                readActivationTargetInfo afterScaledTapCb@{ afterScaledTap ->
+                  if (didToggleStateChange(info, afterScaledTap)) {
+                    remoteActivationInProgress = false
+                    return@afterScaledTapCb
+                  }
+
+                  forceToggleFocusedControlInWebView {
+                    remoteActivationInProgress = false
+                  }
+                }
+              }, 80)
+              return@afterRawTapCb
             }
 
             forceToggleFocusedControlInWebView {
               remoteActivationInProgress = false
             }
           }
-        }, 80)
+        }, 90)
       }
     }, 80)
   }
 
   private fun dispatchOriginalSelectToWebView(originalEvent: KeyEvent?): Boolean {
-    val keyCode = when (originalEvent?.keyCode) {
+    val normalizedKeyCode = when (originalEvent?.keyCode) {
       KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_DPAD_CENTER
       KeyEvent.KEYCODE_DPAD_CENTER -> KeyEvent.KEYCODE_DPAD_CENTER
       else -> KeyEvent.KEYCODE_DPAD_CENTER
@@ -344,36 +361,25 @@ class MainActivity : AppCompatActivity() {
     val source = originalEvent?.source ?: InputDevice.SOURCE_DPAD
     val deviceId = originalEvent?.deviceId?.takeIf { it >= 0 } ?: -1
     val scanCode = originalEvent?.scanCode ?: 0
-    val downTime = SystemClock.uptimeMillis()
+    val candidateCodes = listOf(
+      normalizedKeyCode,
+      KeyEvent.KEYCODE_ENTER,
+      KeyEvent.KEYCODE_NUMPAD_ENTER,
+      KeyEvent.KEYCODE_SPACE
+    ).distinct()
 
-    val down = KeyEvent(
-      downTime,
-      downTime,
-      KeyEvent.ACTION_DOWN,
-      keyCode,
-      0,
-      metaState,
-      deviceId,
-      scanCode,
-      flags,
-      source
-    )
-    val up = KeyEvent(
-      downTime,
-      SystemClock.uptimeMillis(),
-      KeyEvent.ACTION_UP,
-      keyCode,
-      0,
-      metaState,
-      deviceId,
-      scanCode,
-      flags,
-      source
-    )
-
-    val handledDown = webView.dispatchKeyEvent(down)
-    val handledUp = webView.dispatchKeyEvent(up)
-    return handledDown || handledUp
+    var handled = false
+    for (code in candidateCodes) {
+      handled = dispatchNativeKeyToWebView(
+        keyCode = code,
+        metaState = metaState,
+        flags = flags,
+        source = source,
+        deviceId = deviceId,
+        scanCode = scanCode
+      ) || handled
+    }
+    return handled
   }
 
   private fun runJsActivateFocused(onComplete: (() -> Unit)? = null) {
@@ -451,25 +457,61 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
-  private fun dispatchNativeKeyToWebView(keyCode: Int) {
+  private fun dispatchNativeKeyToWebView(
+    keyCode: Int,
+    metaState: Int = 0,
+    flags: Int = KeyEvent.FLAG_FROM_SYSTEM,
+    source: Int = InputDevice.SOURCE_DPAD,
+    deviceId: Int = -1,
+    scanCode: Int = 0
+  ): Boolean {
     val downTime = SystemClock.uptimeMillis()
-    val down = KeyEvent(downTime, downTime, KeyEvent.ACTION_DOWN, keyCode, 0)
-    val up = KeyEvent(downTime, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, keyCode, 0)
-    webView.dispatchKeyEvent(down)
-    webView.dispatchKeyEvent(up)
+    val down = KeyEvent(
+      downTime,
+      downTime,
+      KeyEvent.ACTION_DOWN,
+      keyCode,
+      0,
+      metaState,
+      deviceId,
+      scanCode,
+      flags,
+      source
+    )
+    val up = KeyEvent(
+      downTime,
+      SystemClock.uptimeMillis(),
+      KeyEvent.ACTION_UP,
+      keyCode,
+      0,
+      metaState,
+      deviceId,
+      scanCode,
+      flags,
+      source
+    )
+    val handledDown = webView.dispatchKeyEvent(down)
+    val handledUp = webView.dispatchKeyEvent(up)
+    return handledDown || handledUp
   }
 
-  private fun dispatchNativeTapToWebView(info: ActivationTargetInfo) {
+  private fun dispatchNativeTapToWebView(info: ActivationTargetInfo, useScaledCoordinates: Boolean) {
     if (webView.width <= 0 || webView.height <= 0) return
 
     val maxX = (webView.width - 1).coerceAtLeast(1).toFloat()
     val maxY = (webView.height - 1).coerceAtLeast(1).toFloat()
-    val x = (info.x * info.dpr).toFloat().coerceIn(1f, maxX)
-    val y = (info.y * info.dpr).toFloat().coerceIn(1f, maxY)
+    val rawX = info.x.toFloat()
+    val rawY = info.y.toFloat()
+    val scaledX = (info.x * info.dpr).toFloat()
+    val scaledY = (info.y * info.dpr).toFloat()
+    val x = if (useScaledCoordinates) scaledX else rawX
+    val y = if (useScaledCoordinates) scaledY else rawY
+    val clampedX = x.coerceIn(1f, maxX)
+    val clampedY = y.coerceIn(1f, maxY)
 
     val downTime = SystemClock.uptimeMillis()
-    val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
-    val up = MotionEvent.obtain(downTime, downTime + 40L, MotionEvent.ACTION_UP, x, y, 0)
+    val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, clampedX, clampedY, 0)
+    val up = MotionEvent.obtain(downTime, downTime + 40L, MotionEvent.ACTION_UP, clampedX, clampedY, 0)
     down.source = InputDevice.SOURCE_TOUCHSCREEN
     up.source = InputDevice.SOURCE_TOUCHSCREEN
 
