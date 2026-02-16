@@ -143,17 +143,6 @@ class MainActivity : AppCompatActivity() {
         openSettings()
         return true
       }
-      KeyEvent.KEYCODE_DPAD_CENTER,
-      KeyEvent.KEYCODE_BUTTON_A -> {
-        if ((event?.repeatCount ?: 0) == 0) {
-          webView.requestFocus()
-          if (event != null) {
-            webView.dispatchKeyEvent(KeyEvent(event))
-          }
-          activateFocusedElementInWebView(event, skipDirectForward = true)
-        }
-        return true
-      }
       KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
       KeyEvent.KEYCODE_MEDIA_PLAY,
       KeyEvent.KEYCODE_MEDIA_PAUSE -> {
@@ -174,16 +163,16 @@ class MainActivity : AppCompatActivity() {
     return super.onKeyDown(keyCode, event)
   }
 
-  override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-    return when (keyCode) {
-      KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BUTTON_A -> {
-        if (event != null) {
-          webView.dispatchKeyEvent(KeyEvent(event))
-        }
-        true
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    if (isSelectKey(event.keyCode)) {
+      webView.requestFocus()
+      webView.dispatchKeyEvent(KeyEvent(event))
+      if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+        activateFocusedElementInWebView(event, skipDirectForward = true)
       }
-      else -> super.onKeyUp(keyCode, event)
+      return true
     }
+    return super.dispatchKeyEvent(event)
   }
 
   override fun onBackPressed() {
@@ -291,6 +280,10 @@ class MainActivity : AppCompatActivity() {
            lowerUrl.contains("/auth") || 
            lowerUrl.contains("/signin") ||
            lowerUrl.contains("/sign-in")
+  }
+
+  private fun isSelectKey(keyCode: Int): Boolean {
+    return keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_BUTTON_A
   }
 
   private fun activateFocusedElementInWebView(originalEvent: KeyEvent?, skipDirectForward: Boolean = false) {
@@ -872,12 +865,15 @@ class MainActivity : AppCompatActivity() {
 
           function dispatchKeyboardActivation(target) {
             if (!target) return;
-            var keyDefs = [{ key: ' ', code: 'Space', keyCode: 32, which: 32 }];
+            var keyDefs = [
+              { key: ' ', code: 'Space', keyCode: 32, which: 32 },
+              { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }
+            ];
             var role = ((target.getAttribute && target.getAttribute('role')) || '').toLowerCase();
             var tag = (target.tagName || '').toLowerCase();
             var buttonLike = role === 'button' || tag === 'button' || tag === 'a';
             if (buttonLike) {
-              keyDefs.push({ key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+              keyDefs.push({ key: 'NumpadEnter', code: 'NumpadEnter', keyCode: 13, which: 13 });
             }
             suppressSyntheticKeyHandling = true;
             try {

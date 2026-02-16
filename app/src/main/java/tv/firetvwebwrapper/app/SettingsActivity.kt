@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
@@ -16,6 +17,7 @@ import kotlinx.coroutines.withContext
 
 class SettingsActivity : AppCompatActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
+    delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_YES
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_settings)
 
