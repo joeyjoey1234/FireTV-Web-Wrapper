@@ -497,20 +497,32 @@ class MainActivity : AppCompatActivity() {
           }
 
           function dispatchPointerSequence(target) {
+            var rect = target.getBoundingClientRect();
+            var cx = Math.round(rect.left + rect.width / 2);
+            var cy = Math.round(rect.top + rect.height / 2);
+
             if (typeof PointerEvent !== 'undefined') {
               var pointerDown = new PointerEvent('pointerdown', {
                 view: window,
                 bubbles: true,
                 cancelable: true,
                 pointerId: 1,
-                pointerType: 'mouse'
+                pointerType: 'mouse',
+                clientX: cx,
+                clientY: cy,
+                button: 0,
+                buttons: 1
               });
               var pointerUp = new PointerEvent('pointerup', {
                 view: window,
                 bubbles: true,
                 cancelable: true,
                 pointerId: 1,
-                pointerType: 'mouse'
+                pointerType: 'mouse',
+                clientX: cx,
+                clientY: cy,
+                button: 0,
+                buttons: 0
               });
               target.dispatchEvent(pointerDown);
               target.dispatchEvent(pointerUp);
@@ -519,14 +531,22 @@ class MainActivity : AppCompatActivity() {
             var mousedownEvent = new MouseEvent('mousedown', {
               view: window,
               bubbles: true,
-              cancelable: true
+              cancelable: true,
+              clientX: cx,
+              clientY: cy,
+              button: 0,
+              buttons: 1
             });
             target.dispatchEvent(mousedownEvent);
 
             var mouseupEvent = new MouseEvent('mouseup', {
               view: window,
               bubbles: true,
-              cancelable: true
+              cancelable: true,
+              clientX: cx,
+              clientY: cy,
+              button: 0,
+              buttons: 0
             });
             target.dispatchEvent(mouseupEvent);
           }
@@ -577,6 +597,40 @@ class MainActivity : AppCompatActivity() {
             }
           }
 
+          function dispatchDragToggle(target) {
+            if (!target) return;
+            var rect = target.getBoundingClientRect();
+            if (rect.width < 8 || rect.height < 8) return;
+            var startX = Math.round(rect.left + Math.max(2, rect.width * 0.15));
+            var endX = Math.round(rect.right - Math.max(2, rect.width * 0.15));
+            var y = Math.round(rect.top + rect.height / 2);
+
+            if (typeof PointerEvent !== 'undefined') {
+              target.dispatchEvent(new PointerEvent('pointerdown', {
+                view: window, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse',
+                clientX: startX, clientY: y, button: 0, buttons: 1
+              }));
+              target.dispatchEvent(new PointerEvent('pointermove', {
+                view: window, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse',
+                clientX: endX, clientY: y, button: 0, buttons: 1
+              }));
+              target.dispatchEvent(new PointerEvent('pointerup', {
+                view: window, bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse',
+                clientX: endX, clientY: y, button: 0, buttons: 0
+              }));
+            }
+
+            target.dispatchEvent(new MouseEvent('mousedown', {
+              view: window, bubbles: true, cancelable: true, clientX: startX, clientY: y, button: 0, buttons: 1
+            }));
+            target.dispatchEvent(new MouseEvent('mousemove', {
+              view: window, bubbles: true, cancelable: true, clientX: endX, clientY: y, button: 0, buttons: 1
+            }));
+            target.dispatchEvent(new MouseEvent('mouseup', {
+              view: window, bubbles: true, cancelable: true, clientX: endX, clientY: y, button: 0, buttons: 0
+            }));
+          }
+
           function dispatchClick(el, clickCount) {
             var target = resolveClickTarget(el);
             if (!target || target.hasAttribute('disabled')) return;
@@ -607,6 +661,14 @@ class MainActivity : AppCompatActivity() {
               var afterClickState = readToggleState(target);
               if (beforeState !== null && afterClickState !== null && afterClickState !== beforeState) {
                 return;
+              }
+
+              if (beforeState !== null && afterClickState !== null && afterClickState === beforeState) {
+                dispatchDragToggle(target);
+                var afterDragState = readToggleState(target);
+                if (afterDragState !== null && afterDragState !== beforeState) {
+                  return;
+                }
               }
             }
           }
