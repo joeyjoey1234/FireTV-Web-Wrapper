@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity() {
       KeyEvent.KEYCODE_DPAD_CENTER,
       KeyEvent.KEYCODE_BUTTON_A -> {
         if ((event?.repeatCount ?: 0) == 0) {
-          activateFocusedElementInWebView()
+          activateFocusedElementInWebView(event)
         }
         return true
       }
@@ -277,43 +277,103 @@ class MainActivity : AppCompatActivity() {
            lowerUrl.contains("/sign-in")
   }
 
-  private fun activateFocusedElementInWebView() {
+  private fun activateFocusedElementInWebView(originalEvent: KeyEvent?) {
     if (remoteActivationInProgress) return
     remoteActivationInProgress = true
     webView.requestFocus()
 
-    readActivationTargetInfo outer@{ info ->
-      if (info == null || info.toggleState == null) {
-        runJsActivateFocused {
-          remoteActivationInProgress = false
-        }
-        return@outer
-      }
-
-      dispatchNativeKeyToWebView(KeyEvent.KEYCODE_SPACE)
-      webView.postDelayed({
-        readActivationTargetInfo afterSpaceCb@{ afterSpace ->
-          if (didToggleStateChange(info, afterSpace)) {
-            remoteActivationInProgress = false
-            return@afterSpaceCb
-          }
-
-          dispatchNativeTapToWebView(info)
-          webView.postDelayed({
-            readActivationTargetInfo afterTapCb@{ afterTap ->
-              if (didToggleStateChange(info, afterTap)) {
-                remoteActivationInProgress = false
-                return@afterTapCb
-              }
-
-              forceToggleFocusedControlInWebView {
-                remoteActivationInProgress = false
-              }
+    readActivationTargetInfo beforeCb@{ beforeInfo ->
+      val handledByWebView = dispatchOriginalSelectToWebView(originalEvent)
+      if (handledByWebView) {
+        webView.postDelayed({
+          readActivationTargetInfo afterForwardCb@{ afterForward ->
+            if (beforeInfo != null && didToggleStateChange(beforeInfo, afterForward)) {
+              remoteActivationInProgress = false
+              return@afterForwardCb
             }
-          }, 80)
-        }
-      }, 80)
+            runActivationFallback(beforeInfo)
+          }
+        }, 80)
+      } else {
+        runActivationFallback(beforeInfo)
+      }
     }
+  }
+
+  private fun runActivationFallback(info: ActivationTargetInfo?) {
+    if (info == null || info.toggleState == null) {
+      runJsActivateFocused {
+        remoteActivationInProgress = false
+      }
+      return
+    }
+
+    dispatchNativeKeyToWebView(KeyEvent.KEYCODE_SPACE)
+    webView.postDelayed({
+      readActivationTargetInfo afterSpaceCb@{ afterSpace ->
+        if (didToggleStateChange(info, afterSpace)) {
+          remoteActivationInProgress = false
+          return@afterSpaceCb
+        }
+
+        dispatchNativeTapToWebView(info)
+        webView.postDelayed({
+          readActivationTargetInfo afterTapCb@{ afterTap ->
+            if (didToggleStateChange(info, afterTap)) {
+              remoteActivationInProgress = false
+              return@afterTapCb
+            }
+
+            forceToggleFocusedControlInWebView {
+              remoteActivationInProgress = false
+            }
+          }
+        }, 80)
+      }
+    }, 80)
+  }
+
+  private fun dispatchOriginalSelectToWebView(originalEvent: KeyEvent?): Boolean {
+    val keyCode = when (originalEvent?.keyCode) {
+      KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_DPAD_CENTER
+      KeyEvent.KEYCODE_DPAD_CENTER -> KeyEvent.KEYCODE_DPAD_CENTER
+      else -> KeyEvent.KEYCODE_DPAD_CENTER
+    }
+    val metaState = originalEvent?.metaState ?: 0
+    val flags = (originalEvent?.flags ?: 0) or KeyEvent.FLAG_FROM_SYSTEM
+    val source = originalEvent?.source ?: InputDevice.SOURCE_DPAD
+    val deviceId = originalEvent?.deviceId?.takeIf { it >= 0 } ?: -1
+    val scanCode = originalEvent?.scanCode ?: 0
+    val downTime = SystemClock.uptimeMillis()
+
+    val down = KeyEvent(
+      downTime,
+      downTime,
+      KeyEvent.ACTION_DOWN,
+      keyCode,
+      0,
+      metaState,
+      deviceId,
+      scanCode,
+      flags,
+      source
+    )
+    val up = KeyEvent(
+      downTime,
+      SystemClock.uptimeMillis(),
+      KeyEvent.ACTION_UP,
+      keyCode,
+      0,
+      metaState,
+      deviceId,
+      scanCode,
+      flags,
+      source
+    )
+
+    val handledDown = webView.dispatchKeyEvent(down)
+    val handledUp = webView.dispatchKeyEvent(up)
+    return handledDown || handledUp
   }
 
   private fun runJsActivateFocused(onComplete: (() -> Unit)? = null) {
