@@ -132,6 +132,12 @@ class MainActivity : AppCompatActivity() {
         openSettings()
         return true
       }
+      KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BUTTON_A -> {
+        if ((event?.repeatCount ?: 0) == 0) {
+          activateFocusedElementInWebView()
+        }
+        return true
+      }
       KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_BUTTON_R1 -> {
         if (webView.canGoForward()) {
           webView.goForward()
@@ -249,6 +255,40 @@ class MainActivity : AppCompatActivity() {
            lowerUrl.contains("/auth") || 
            lowerUrl.contains("/signin") ||
            lowerUrl.contains("/sign-in")
+  }
+
+  private fun activateFocusedElementInWebView() {
+    val script = """
+      (function() {
+        try {
+          if (window.__jstvActivateFocused && window.__jstvActivateFocused()) {
+            return;
+          }
+          var el = document.activeElement;
+          if (!el || el === document.body) {
+            el = document.querySelector('[role="checkbox"][tabindex], [role="switch"][tabindex], [role="slider"][tabindex], button, a[href], input, select, textarea, [tabindex]');
+          }
+          if (!el) return;
+          if (typeof el.focus === 'function') {
+            el.focus();
+          }
+          if (typeof PointerEvent !== 'undefined') {
+            el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
+            el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse' }));
+          }
+          el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+          el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+          if (typeof el.click === 'function') {
+            el.click();
+          } else {
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+          }
+        } catch (e) {
+          // no-op
+        }
+      })();
+    """.trimIndent()
+    webView.evaluateJavascript(script, null)
   }
 
   private fun injectTvHelpers(view: WebView) {
@@ -384,6 +424,13 @@ class MainActivity : AppCompatActivity() {
             return role === 'slider' || role === 'spinbutton';
           }
 
+          function isActivationKey(e) {
+            if (!e) return false;
+            if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') return true;
+            if (e.keyCode === 13 || e.keyCode === 32 || e.keyCode === 23) return true;
+            return false;
+          }
+
           function findNext(direction) {
             var focusable = getFocusable();
             if (!focusable.length) return null;
@@ -502,6 +549,26 @@ class MainActivity : AppCompatActivity() {
             }
           }
 
+          function getActivationTarget() {
+            var active = document.activeElement;
+            if (active && active !== document.body) {
+              return active;
+            }
+            var topModal = getTopModal();
+            var searchRoot = topModal || document;
+            return searchRoot.querySelector('[role="checkbox"][tabindex], [role="switch"][tabindex], [role="slider"][tabindex], button, a[href], input, textarea, select, [tabindex]');
+          }
+
+          window.__jstvActivateFocused = function() {
+            var target = getActivationTarget();
+            if (!target) return false;
+            if (target.focus) {
+              target.focus();
+            }
+            dispatchClick(target, 1);
+            return true;
+          };
+
           function handleEnter(e) {
             var active = document.activeElement;
             if (!active || active === document.body) return;
@@ -541,6 +608,9 @@ class MainActivity : AppCompatActivity() {
               case 'Enter':
                 handleEnter(e);
                 break;
+              case ' ':
+                handleEnter(e);
+                break;
               case 'ArrowUp':
                 e.preventDefault();
                 moveFocus('up');
@@ -567,6 +637,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 break;
               default:
+                if (isActivationKey(e)) {
+                  handleEnter(e);
+                }
                 break;
             }
           }
