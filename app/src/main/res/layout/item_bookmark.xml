@@ -4,6 +4,9 @@
   android:layout_height="wrap_content"
   android:layout_marginBottom="12dp"
   android:background="@drawable/bg_bookmark_item"
+  android:descendantFocusability="afterDescendants"
+  android:focusable="false"
+  android:focusableInTouchMode="false"
   android:orientation="vertical"
   android:padding="16dp">
 
@@ -55,6 +58,8 @@
       android:id="@+id/action_set_home"
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
+      android:focusable="true"
+      android:focusableInTouchMode="true"
       android:text="@string/bookmark_set_home" />
 
     <Button
@@ -62,6 +67,8 @@
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:layout_marginStart="12dp"
+      android:focusable="true"
+      android:focusableInTouchMode="true"
       android:text="@string/bookmark_delete" />
   </LinearLayout>
 

@@ -283,6 +283,7 @@ class MainActivity : AppCompatActivity() {
           }
 
           var clickTracker = { element: null, count: 0, timer: null };
+          var focusSelector = '[tabindex], a, button, input, textarea, select, [role="button"], [role="link"], [role="checkbox"], [role="switch"], [role="slider"], [aria-checked], [onclick]';
 
           function isVisible(el) {
             if (!el) return false;
@@ -291,7 +292,7 @@ class MainActivity : AppCompatActivity() {
           }
 
           function ensureFocusable() {
-            var nodes = document.querySelectorAll('a, button, input, textarea, select, [role="button"], [role="link"], [role="checkbox"], [tabindex], [onclick]');
+            var nodes = document.querySelectorAll(focusSelector);
             for (var i = 0; i < nodes.length; i++) {
               var el = nodes[i];
               if (el.getAttribute('tabindex') === null && !el.hasAttribute('disabled')) {
@@ -346,7 +347,7 @@ class MainActivity : AppCompatActivity() {
             var topModal = getTopModal();
             var searchRoot = topModal || document;
             
-            var nodes = searchRoot.querySelectorAll('[tabindex], a, button, input, textarea, select, [role="button"], [role="link"], [role="checkbox"], [onclick]');
+            var nodes = searchRoot.querySelectorAll(focusSelector);
             var out = [];
             
             for (var i = 0; i < nodes.length; i++) {
@@ -370,6 +371,17 @@ class MainActivity : AppCompatActivity() {
             if (!el) return false;
             var tag = (el.tagName || '').toLowerCase();
             return tag === 'input' || tag === 'textarea' || el.isContentEditable;
+          }
+
+          function handlesArrowKeys(el) {
+            if (!el) return false;
+            var tag = (el.tagName || '').toLowerCase();
+            if (tag === 'input') {
+              var inputType = (el.type || '').toLowerCase();
+              return inputType === 'range' || inputType === 'number' || inputType === 'date' || inputType === 'time';
+            }
+            var role = ((el.getAttribute && el.getAttribute('role')) || '').toLowerCase();
+            return role === 'slider' || role === 'spinbutton';
           }
 
           function findNext(direction) {
@@ -421,69 +433,72 @@ class MainActivity : AppCompatActivity() {
             }
           }
 
-          function dispatchClick(el, clickCount) {
-            // For movie cards with nested <a> tags, click the link directly
-            if (el.hasAttribute('role') && el.getAttribute('role') === 'link') {
-              var link = el.querySelector('a[href]');
-              if (link) {
-                link.click();
-                return;
-              }
+          function resolveClickTarget(el) {
+            if (!el) return null;
+            var targetSelector = 'input[type="checkbox"], input[type="radio"], input[type="range"], button, a[href], [role="switch"], [role="checkbox"], [role="button"], [role="slider"], label';
+            if (el.matches && el.matches(targetSelector)) return el;
+            if (el.hasAttribute && el.getAttribute('role') === 'link') {
+              var nestedLink = el.querySelector('a[href]');
+              if (nestedLink) return nestedLink;
             }
-            
-            // For toggle switches (role="checkbox"), dispatch full event sequence
-            if (el.hasAttribute('role') && el.getAttribute('role') === 'checkbox') {
-              var events = ['mousedown', 'mouseup', 'click'];
-              for (var j = 0; j < events.length; j++) {
-                var evt = new MouseEvent(events[j], {
-                  view: window,
-                  bubbles: true,
-                  cancelable: true,
-                  detail: 1
-                });
-                el.dispatchEvent(evt);
-              }
-              // Also dispatch pointer events for React
+            var descendant = el.querySelector ? el.querySelector(targetSelector) : null;
+            if (descendant) return descendant;
+            var ancestor = el.closest ? el.closest(targetSelector) : null;
+            return ancestor || el;
+          }
+
+          function dispatchPointerSequence(target) {
+            if (typeof PointerEvent !== 'undefined') {
               var pointerDown = new PointerEvent('pointerdown', {
+                view: window,
                 bubbles: true,
                 cancelable: true,
                 pointerId: 1,
                 pointerType: 'mouse'
               });
               var pointerUp = new PointerEvent('pointerup', {
+                view: window,
                 bubbles: true,
                 cancelable: true,
                 pointerId: 1,
                 pointerType: 'mouse'
               });
-              el.dispatchEvent(pointerDown);
-              el.dispatchEvent(pointerUp);
-              return;
+              target.dispatchEvent(pointerDown);
+              target.dispatchEvent(pointerUp);
             }
-            
-            // Default click handling for other elements
+
+            var mousedownEvent = new MouseEvent('mousedown', {
+              view: window,
+              bubbles: true,
+              cancelable: true
+            });
+            target.dispatchEvent(mousedownEvent);
+
+            var mouseupEvent = new MouseEvent('mouseup', {
+              view: window,
+              bubbles: true,
+              cancelable: true
+            });
+            target.dispatchEvent(mouseupEvent);
+          }
+
+          function dispatchClick(el, clickCount) {
+            var target = resolveClickTarget(el);
+            if (!target || target.hasAttribute('disabled')) return;
+
             for (var i = 0; i < clickCount; i++) {
-              var mousedownEvent = new MouseEvent('mousedown', {
-                view: window,
-                bubbles: true,
-                cancelable: true
-              });
-              el.dispatchEvent(mousedownEvent);
-              
-              var mouseupEvent = new MouseEvent('mouseup', {
-                view: window,
-                bubbles: true,
-                cancelable: true
-              });
-              el.dispatchEvent(mouseupEvent);
-              
-              var clickEvent = new MouseEvent('click', {
-                view: window,
-                bubbles: true,
-                cancelable: true,
-                detail: i + 1
-              });
-              el.dispatchEvent(clickEvent);
+              dispatchPointerSequence(target);
+              if (typeof target.click === 'function') {
+                target.click();
+              } else {
+                var clickEvent = new MouseEvent('click', {
+                  view: window,
+                  bubbles: true,
+                  cancelable: true,
+                  detail: i + 1
+                });
+                target.dispatchEvent(clickEvent);
+              }
             }
           }
 
@@ -514,6 +529,11 @@ class MainActivity : AppCompatActivity() {
           function onKeyDown(e) {
             if (isTextInput(document.activeElement) && 
                 (e.key !== 'Enter' && e.key !== 'Escape')) {
+              return;
+            }
+
+            if (handlesArrowKeys(document.activeElement) &&
+                (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
               return;
             }
             
@@ -563,7 +583,7 @@ class MainActivity : AppCompatActivity() {
                   if (node.nodeType === 1) {
                     var topModal = getTopModal();
                     if (topModal) {
-                      var focusable = topModal.querySelectorAll('[tabindex], a, button, input, textarea, select, [role="button"]');
+                      var focusable = topModal.querySelectorAll(focusSelector);
                       if (focusable.length > 0) {
                         focusable[0].focus();
                       }

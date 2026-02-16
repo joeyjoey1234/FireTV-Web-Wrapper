@@ -3,6 +3,7 @@ package tv.firetvwebwrapper.app
 import android.os.Bundle
 import android.text.InputType
 import android.view.MenuItem
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ListView
@@ -29,6 +30,10 @@ class BookmarkManagerActivity : AppCompatActivity() {
     )
     listView.adapter = adapter
     listView.emptyView = findViewById(R.id.bookmark_empty_view)
+    listView.itemsCanFocus = true
+    listView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+    listView.isFocusable = true
+    listView.isFocusableInTouchMode = true
 
     findViewById<Button>(R.id.add_bookmark_button).setOnClickListener {
       promptForBookmark()

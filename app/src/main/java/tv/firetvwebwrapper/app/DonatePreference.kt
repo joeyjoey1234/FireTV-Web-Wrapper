@@ -19,8 +19,8 @@ class DonatePreference @JvmOverloads constructor(
   defStyleAttr: Int = androidx.preference.R.attr.preferenceStyle
 ) : Preference(context, attrs, defStyleAttr) {
 
-  private val donateUrl = "https://buymeacoffee.com/ericm"
-  private val username = "ericm"
+  private val donateUrl = "https://buymeacoffee.com/joejoe1234"
+  private val username = "joejoe1234"
 
   init {
     setOnPreferenceClickListener {
@@ -37,8 +37,8 @@ class DonatePreference @JvmOverloads constructor(
     }
 
     AlertDialog.Builder(context)
-      .setTitle("Support Development")
-      .setMessage("Scan this QR code or open the link below to buy Eric a coffee!\n\nUsername: $username")
+      .setTitle("Buy Me a Coffee")
+      .setMessage("Scan this QR code or open the link below.\n\nUsername: $username")
       .setView(imageView)
       .setPositiveButton("Open Link") { _, _ -> openDonateLink() }
       .setNegativeButton("Close", null)

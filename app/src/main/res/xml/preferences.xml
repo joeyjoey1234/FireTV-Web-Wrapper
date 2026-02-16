@@ -52,7 +52,7 @@
 
     <tv.firetvwebwrapper.app.DonatePreference
       android:key="donate"
-      android:title="☕ Buy Me a Coffee"
+      android:title="@string/pref_donate_title"
       android:summary="@string/pref_donate_summary" />
   </PreferenceCategory>
 

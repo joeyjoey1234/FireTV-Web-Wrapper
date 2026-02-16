@@ -28,6 +28,7 @@
   <string name="pref_allow_invalid_ssl_title">Allow invalid SSL</string>
   <string name="pref_allow_invalid_ssl_summary">Accept self-signed or expired certificates</string>
   <string name="pref_donate_summary">Support the project (optional)</string>
+  <string name="pref_donate_title">☕ Buy JoeJoe1234 a Coffee</string>
 
   <string name="bookmark_manager_title">Saved URLs</string>
   <string name="bookmark_add">Add URL</string>
