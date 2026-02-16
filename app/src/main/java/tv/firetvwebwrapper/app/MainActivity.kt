@@ -132,7 +132,8 @@ class MainActivity : AppCompatActivity() {
         openSettings()
         return true
       }
-      KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BUTTON_A -> {
+      KeyEvent.KEYCODE_DPAD_CENTER,
+      KeyEvent.KEYCODE_BUTTON_A -> {
         if ((event?.repeatCount ?: 0) == 0) {
           activateFocusedElementInWebView()
         }
@@ -426,8 +427,8 @@ class MainActivity : AppCompatActivity() {
 
           function isActivationKey(e) {
             if (!e) return false;
-            if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') return true;
-            if (e.keyCode === 13 || e.keyCode === 32 || e.keyCode === 23) return true;
+            if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.key === ' ' || e.code === 'Space') return true;
+            if (e.keyCode === 13 || e.keyCode === 32 || e.keyCode === 23 || e.keyCode === 66) return true;
             return false;
           }
 
@@ -529,11 +530,61 @@ class MainActivity : AppCompatActivity() {
             target.dispatchEvent(mouseupEvent);
           }
 
+          function readToggleState(target) {
+            if (!target) return null;
+            if (target.matches && target.matches('input[type="checkbox"], input[type="radio"]')) {
+              return target.checked ? 'true' : 'false';
+            }
+            var aria = target.getAttribute ? target.getAttribute('aria-checked') : null;
+            if (aria === 'true' || aria === 'false') {
+              return aria;
+            }
+            return null;
+          }
+
+          function dispatchKeyboardActivation(target) {
+            if (!target) return;
+            var keyDefs = [
+              { key: ' ', code: 'Space', keyCode: 32, which: 32 },
+              { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }
+            ];
+            for (var i = 0; i < keyDefs.length; i++) {
+              var keyDef = keyDefs[i];
+              var down = new KeyboardEvent('keydown', {
+                key: keyDef.key,
+                code: keyDef.code,
+                keyCode: keyDef.keyCode,
+                which: keyDef.which,
+                bubbles: true,
+                cancelable: true
+              });
+              var up = new KeyboardEvent('keyup', {
+                key: keyDef.key,
+                code: keyDef.code,
+                keyCode: keyDef.keyCode,
+                which: keyDef.which,
+                bubbles: true,
+                cancelable: true
+              });
+              target.dispatchEvent(down);
+              target.dispatchEvent(up);
+            }
+          }
+
           function dispatchClick(el, clickCount) {
             var target = resolveClickTarget(el);
             if (!target || target.hasAttribute('disabled')) return;
 
             for (var i = 0; i < clickCount; i++) {
+              var beforeState = readToggleState(target);
+              if (beforeState !== null) {
+                dispatchKeyboardActivation(target);
+                var afterKeyState = readToggleState(target);
+                if (afterKeyState !== null && afterKeyState !== beforeState) {
+                  return;
+                }
+              }
+
               dispatchPointerSequence(target);
               if (typeof target.click === 'function') {
                 target.click();
@@ -545,6 +596,11 @@ class MainActivity : AppCompatActivity() {
                   detail: i + 1
                 });
                 target.dispatchEvent(clickEvent);
+              }
+
+              var afterClickState = readToggleState(target);
+              if (beforeState !== null && afterClickState !== null && afterClickState !== beforeState) {
+                return;
               }
             }
           }
@@ -606,6 +662,9 @@ class MainActivity : AppCompatActivity() {
             
             switch (e.key) {
               case 'Enter':
+                handleEnter(e);
+                break;
+              case 'NumpadEnter':
                 handleEnter(e);
                 break;
               case ' ':

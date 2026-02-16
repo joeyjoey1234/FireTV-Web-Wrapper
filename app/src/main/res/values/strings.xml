@@ -4,6 +4,7 @@
   <string name="setup_title">Connect to Web Interface</string>
   <string name="setup_instructions">Enter the full HTTP or HTTPS URL to your web application.</string>
   <string name="setup_hint">https://192.168.1.100:8096</string>
+  <string name="setup_example_text">Example: http://192.168.1.10:5055</string>
   <string name="setup_button">Continue</string>
   <string name="settings_title">Settings</string>
   <string name="invalid_url">Please enter a valid http:// or https:// URL.</string>

@@ -33,11 +33,7 @@ object UpdateInstaller {
     if (!dir.exists()) {
       dir.mkdirs()
     }
-    val safeName = when {
-      assetName.isNullOrBlank() -> "firetv-web-wrapper-update.apk"
-      assetName.endsWith(".apk", ignoreCase = true) -> assetName
-      else -> "$assetName.apk"
-    }
+    val safeName = sanitizeApkFileName(assetName)
     val target = File(dir, safeName)
     if (target.exists()) {
       target.delete()
@@ -100,6 +96,21 @@ object UpdateInstaller {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     context.startActivity(intent)
+  }
+
+  private fun sanitizeApkFileName(assetName: String?): String {
+    val fallback = "firetv-web-wrapper-update.apk"
+    val raw = assetName
+      ?.substringAfterLast('/')
+      ?.substringAfterLast('\\')
+      ?.trim()
+      .orEmpty()
+    if (raw.isBlank()) return fallback
+
+    val cleaned = raw.replace(Regex("[^A-Za-z0-9._-]"), "_")
+    val base = cleaned.trim('.').ifBlank { "update" }
+    val truncated = base.take(120).ifBlank { "update" }
+    return if (truncated.endsWith(".apk", ignoreCase = true)) truncated else "$truncated.apk"
   }
 
   private fun updatesDir(context: Context): File = File(context.cacheDir, UPDATE_FOLDER)

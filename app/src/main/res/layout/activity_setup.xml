@@ -41,7 +41,7 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_marginTop="8dp"
-    android:text="Example: http://192.168.1.10:5055"
+    android:text="@string/setup_example_text"
     android:textColor="@color/jst_text_muted"
     android:textSize="14sp" />
 
