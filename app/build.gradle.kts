@@ -40,8 +40,8 @@ android {
     applicationId = "tv.firetvwebwrapper.app"
     minSdk = 30
     targetSdk = 34
-    versionCode = 12
-    versionName = "1.1.10"
+    versionCode = 13
+    versionName = "1.1.11"
   }
 
   buildTypes {

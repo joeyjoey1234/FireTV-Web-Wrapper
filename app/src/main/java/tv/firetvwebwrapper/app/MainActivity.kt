@@ -146,7 +146,11 @@ class MainActivity : AppCompatActivity() {
       KeyEvent.KEYCODE_DPAD_CENTER,
       KeyEvent.KEYCODE_BUTTON_A -> {
         if ((event?.repeatCount ?: 0) == 0) {
-          activateFocusedElementInWebView(event)
+          webView.requestFocus()
+          if (event != null) {
+            webView.dispatchKeyEvent(KeyEvent(event))
+          }
+          activateFocusedElementInWebView(event, skipDirectForward = true)
         }
         return true
       }
@@ -168,6 +172,18 @@ class MainActivity : AppCompatActivity() {
       }
     }
     return super.onKeyDown(keyCode, event)
+  }
+
+  override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+    return when (keyCode) {
+      KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BUTTON_A -> {
+        if (event != null) {
+          webView.dispatchKeyEvent(KeyEvent(event))
+        }
+        true
+      }
+      else -> super.onKeyUp(keyCode, event)
+    }
   }
 
   override fun onBackPressed() {
@@ -277,12 +293,25 @@ class MainActivity : AppCompatActivity() {
            lowerUrl.contains("/sign-in")
   }
 
-  private fun activateFocusedElementInWebView(originalEvent: KeyEvent?) {
+  private fun activateFocusedElementInWebView(originalEvent: KeyEvent?, skipDirectForward: Boolean = false) {
     if (remoteActivationInProgress) return
     remoteActivationInProgress = true
     webView.requestFocus()
 
     readActivationTargetInfo beforeCb@{ beforeInfo ->
+      if (skipDirectForward) {
+        webView.postDelayed({
+          readActivationTargetInfo postDirectCb@{ afterDirect ->
+            if (beforeInfo != null && didToggleStateChange(beforeInfo, afterDirect)) {
+              remoteActivationInProgress = false
+              return@postDirectCb
+            }
+            runActivationFallback(beforeInfo)
+          }
+        }, 90)
+        return@beforeCb
+      }
+
       val handledByWebView = dispatchOriginalSelectToWebView(originalEvent)
       if (handledByWebView) {
         webView.postDelayed({
