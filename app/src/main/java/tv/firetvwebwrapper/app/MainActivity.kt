@@ -139,6 +139,14 @@ class MainActivity : AppCompatActivity() {
         }
         return true
       }
+      KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+      KeyEvent.KEYCODE_MEDIA_PLAY,
+      KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+        if ((event?.repeatCount ?: 0) == 0) {
+          forceToggleFocusedControlInWebView()
+        }
+        return true
+      }
       KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_BUTTON_R1 -> {
         if (webView.canGoForward()) {
           webView.goForward()
@@ -283,6 +291,25 @@ class MainActivity : AppCompatActivity() {
             el.click();
           } else {
             el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+          }
+        } catch (e) {
+          // no-op
+        }
+      })();
+    """.trimIndent()
+    webView.evaluateJavascript(script, null)
+  }
+
+  private fun forceToggleFocusedControlInWebView() {
+    val script = """
+      (function() {
+        try {
+          if (window.__jstvForceToggleFocused) {
+            window.__jstvForceToggleFocused();
+            return;
+          }
+          if (window.__jstvActivateFocused) {
+            window.__jstvActivateFocused();
           }
         } catch (e) {
           // no-op
@@ -563,38 +590,158 @@ class MainActivity : AppCompatActivity() {
             return null;
           }
 
+          function dispatchKeySequence(target, keyDef) {
+            if (!target) return;
+            var dispatchTargets = [];
+            dispatchTargets.push(target);
+            if (document.activeElement && dispatchTargets.indexOf(document.activeElement) === -1) {
+              dispatchTargets.push(document.activeElement);
+            }
+            if (dispatchTargets.indexOf(document) === -1) dispatchTargets.push(document);
+            if (dispatchTargets.indexOf(window) === -1) dispatchTargets.push(window);
+
+            for (var i = 0; i < dispatchTargets.length; i++) {
+              var keyTarget = dispatchTargets[i];
+              try {
+                keyTarget.dispatchEvent(new KeyboardEvent('keydown', {
+                  key: keyDef.key,
+                  code: keyDef.code,
+                  keyCode: keyDef.keyCode,
+                  which: keyDef.which,
+                  bubbles: true,
+                  cancelable: true
+                }));
+                keyTarget.dispatchEvent(new KeyboardEvent('keypress', {
+                  key: keyDef.key,
+                  code: keyDef.code,
+                  keyCode: keyDef.keyCode,
+                  which: keyDef.which,
+                  bubbles: true,
+                  cancelable: true
+                }));
+                keyTarget.dispatchEvent(new KeyboardEvent('keyup', {
+                  key: keyDef.key,
+                  code: keyDef.code,
+                  keyCode: keyDef.keyCode,
+                  which: keyDef.which,
+                  bubbles: true,
+                  cancelable: true
+                }));
+              } catch (_err) {
+                // ignore dispatch failures for non-DOM targets
+              }
+            }
+          }
+
           function dispatchKeyboardActivation(target) {
             if (!target) return;
-            var keyDefs = [
-              { key: ' ', code: 'Space', keyCode: 32, which: 32 },
-              { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }
-            ];
+            var keyDefs = [{ key: ' ', code: 'Space', keyCode: 32, which: 32 }];
+            var role = ((target.getAttribute && target.getAttribute('role')) || '').toLowerCase();
+            var tag = (target.tagName || '').toLowerCase();
+            var buttonLike = role === 'button' || tag === 'button' || tag === 'a';
+            if (buttonLike) {
+              keyDefs.push({ key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+            }
             suppressSyntheticKeyHandling = true;
             try {
               for (var i = 0; i < keyDefs.length; i++) {
-                var keyDef = keyDefs[i];
-                var down = new KeyboardEvent('keydown', {
-                  key: keyDef.key,
-                  code: keyDef.code,
-                  keyCode: keyDef.keyCode,
-                  which: keyDef.which,
-                  bubbles: true,
-                  cancelable: true
-                });
-                var up = new KeyboardEvent('keyup', {
-                  key: keyDef.key,
-                  code: keyDef.code,
-                  keyCode: keyDef.keyCode,
-                  which: keyDef.which,
-                  bubbles: true,
-                  cancelable: true
-                });
-                target.dispatchEvent(down);
-                target.dispatchEvent(up);
+                dispatchKeySequence(target, keyDefs[i]);
               }
             } finally {
               suppressSyntheticKeyHandling = false;
             }
+          }
+
+          function associatedLabelFor(target) {
+            if (!target) return null;
+
+            // Web form APIs first: control.labels is the canonical association list.
+            if (target.labels && target.labels.length) {
+              return target.labels[0];
+            }
+
+            if ((target.tagName || '').toLowerCase() === 'label') {
+              return target;
+            }
+
+            if (target.closest) {
+              var parentLabel = target.closest('label');
+              if (parentLabel) return parentLabel;
+            }
+
+            var ariaLabelledBy = target.getAttribute ? target.getAttribute('aria-labelledby') : null;
+            if (ariaLabelledBy) {
+              var ids = ariaLabelledBy.trim().split(/\s+/);
+              for (var i = 0; i < ids.length; i++) {
+                var labelById = document.getElementById(ids[i]);
+                if (labelById && (labelById.tagName || '').toLowerCase() === 'label') {
+                  return labelById;
+                }
+              }
+            }
+
+            var id = target.id;
+            if (!id) return null;
+            try {
+              if (window.CSS && typeof CSS.escape === 'function') {
+                return document.querySelector('label[for="' + CSS.escape(id) + '"]');
+              }
+            } catch (_err) {
+              // fallback below
+            }
+            var safeId = id.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            return document.querySelector('label[for="' + safeId + '"]');
+          }
+
+          function findNativeFormControl(target) {
+            if (!target) return null;
+            if ((target.tagName || '').toLowerCase() === 'label' && target.control) {
+              var labelledControl = target.control;
+              if (labelledControl.matches && labelledControl.matches('input[type="checkbox"], input[type="radio"]')) {
+                return labelledControl;
+              }
+            }
+            if (target.matches && target.matches('input[type="checkbox"], input[type="radio"]')) {
+              return target;
+            }
+            var nested = target.querySelector ? target.querySelector('input[type="checkbox"], input[type="radio"]') : null;
+            if (nested) return nested;
+            var label = associatedLabelFor(target);
+            if (label && label.querySelector) {
+              var inLabel = label.querySelector('input[type="checkbox"], input[type="radio"]');
+              if (inLabel) return inLabel;
+            }
+            return null;
+          }
+
+          function tryNativeFormActivation(target) {
+            var input = findNativeFormControl(target);
+            if (input) {
+              if (input.focus) input.focus();
+              var before = readToggleState(input);
+              if (typeof input.click === 'function') {
+                input.click();
+              }
+              if (before !== null && readToggleState(input) !== before) {
+                return true;
+              }
+              if (before !== null && typeof input.checked === 'boolean' && !input.disabled) {
+                input.checked = !input.checked;
+                input.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+                if (readToggleState(input) !== before) {
+                  return true;
+                }
+              }
+              var label = associatedLabelFor(input);
+              if (label && typeof label.click === 'function') {
+                label.click();
+                if (before !== null && readToggleState(input) !== before) {
+                  return true;
+                }
+              }
+            }
+            return false;
           }
 
           function dispatchDragToggle(target) {
@@ -637,6 +784,13 @@ class MainActivity : AppCompatActivity() {
 
             for (var i = 0; i < clickCount; i++) {
               var beforeState = readToggleState(target);
+              if (tryNativeFormActivation(target)) {
+                var afterNativeState = readToggleState(target);
+                if (beforeState !== null && afterNativeState !== null && afterNativeState !== beforeState) {
+                  return;
+                }
+              }
+
               if (beforeState !== null) {
                 dispatchKeyboardActivation(target);
                 var afterKeyState = readToggleState(target);
@@ -690,6 +844,53 @@ class MainActivity : AppCompatActivity() {
               target.focus();
             }
             dispatchClick(target, 1);
+            return true;
+          };
+
+          window.__jstvForceToggleFocused = function() {
+            var target = getActivationTarget();
+            if (!target) return false;
+            if (target.focus) {
+              target.focus();
+            }
+
+            var toggleTarget = resolveClickTarget(target) || target;
+            var semanticTarget = toggleTarget;
+            if (!(semanticTarget.getAttribute && semanticTarget.getAttribute('aria-checked') !== null)) {
+              var candidate = (semanticTarget.closest && semanticTarget.closest('[role="checkbox"], [role="switch"], [aria-checked]')) ||
+                (semanticTarget.querySelector && semanticTarget.querySelector('[role="checkbox"], [role="switch"], [aria-checked]'));
+              if (candidate) {
+                semanticTarget = candidate;
+              }
+            }
+
+            var beforeState = readToggleState(semanticTarget);
+
+            if (tryNativeFormActivation(semanticTarget)) {
+              var afterNativeState = readToggleState(semanticTarget);
+              if (beforeState !== null && afterNativeState !== null && afterNativeState !== beforeState) {
+                return true;
+              }
+            }
+
+            dispatchKeyboardActivation(semanticTarget);
+            dispatchPointerSequence(semanticTarget);
+            if (typeof semanticTarget.click === 'function') {
+              semanticTarget.click();
+            }
+
+            var afterState = readToggleState(semanticTarget);
+            if (beforeState !== null && afterState === beforeState) {
+              dispatchDragToggle(semanticTarget);
+              afterState = readToggleState(semanticTarget);
+            }
+
+            if (beforeState !== null && afterState === beforeState &&
+                semanticTarget.getAttribute && semanticTarget.getAttribute('aria-checked') !== null) {
+              semanticTarget.setAttribute('aria-checked', beforeState === 'true' ? 'false' : 'true');
+              semanticTarget.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+              semanticTarget.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+            }
             return true;
           };
 
