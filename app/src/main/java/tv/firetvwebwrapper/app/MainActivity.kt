@@ -299,6 +299,12 @@ class MainActivity : AppCompatActivity() {
               remoteActivationInProgress = false
               return@postDirectCb
             }
+            // If the focused control is not a toggle, the real Select event already
+            // went to WebView. Do not run synthetic fallbacks that can misfire.
+            if (beforeInfo?.toggleState == null) {
+              remoteActivationInProgress = false
+              return@postDirectCb
+            }
             runActivationFallback(beforeInfo)
           }
         }, 90)
