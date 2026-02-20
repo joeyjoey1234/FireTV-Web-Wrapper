@@ -1107,6 +1107,17 @@ class MainActivity : AppCompatActivity() {
               });
               target.dispatchEvent(clickEvent);
             }
+            
+            // Dispatch dblclick event for second click (common pattern for cards/tiles)
+            if (clickDetail === 2) {
+              var dblClickEvent = new MouseEvent('dblclick', {
+                view: window,
+                bubbles: true,
+                cancelable: true,
+                detail: 2
+              });
+              target.dispatchEvent(dblClickEvent);
+            }
 
             var afterClickState = readToggleState(semanticTarget);
             if (beforeState !== null && afterClickState !== null && afterClickState !== beforeState) {
@@ -1260,7 +1271,7 @@ class MainActivity : AppCompatActivity() {
               clickTracker.count = 0;
             }, 500);
             
-            dispatchClick(active, 1);
+            dispatchClick(active, clickTracker.count);
             e.preventDefault();
           }
 
@@ -1269,9 +1280,12 @@ class MainActivity : AppCompatActivity() {
               return;
             }
 
-            if (isTextInput(document.activeElement) && 
-                (e.key !== 'Enter' && e.key !== 'Escape')) {
-              return;
+            // Let the browser handle all keys when typing in text inputs
+            if (isTextInput(document.activeElement)) {
+              // Only intercept Enter (submit) and Escape (close modal)
+              if (e.key !== 'Enter' && e.key !== 'Escape') {
+                return;
+              }
             }
 
             if (handlesArrowKeys(document.activeElement) &&
@@ -1328,6 +1342,9 @@ class MainActivity : AppCompatActivity() {
             var observer = new MutationObserver(function(mutations) {
               ensureFocusable();
               
+              // Only auto-focus into new modals if user is not actively typing
+              if (isTextInput(document.activeElement)) return;
+              
               for (var i = 0; i < mutations.length; i++) {
                 for (var j = 0; j < mutations[i].addedNodes.length; j++) {
                   var node = mutations[i].addedNodes[j];
@@ -1343,7 +1360,7 @@ class MainActivity : AppCompatActivity() {
                 }
               }
             });
-            observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+            observer.observe(document.documentElement, { childList: true, subtree: true });
           }
 
           ensureFocusable();
