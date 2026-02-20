@@ -165,7 +165,7 @@ class MainActivity : AppCompatActivity() {
 
   override fun dispatchKeyEvent(event: KeyEvent): Boolean {
     if (isSelectKey(event.keyCode)) {
-      webView.requestFocus()
+      // Don't steal focus from web content - the WebView will handle focus internally
       webView.dispatchKeyEvent(KeyEvent(event))
       if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
         activateFocusedElementInWebView(event, skipDirectForward = true)

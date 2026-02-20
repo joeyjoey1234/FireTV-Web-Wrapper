@@ -92,6 +92,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
   }
 
   private fun refreshBookmarkSummary() {
+    if (!isAdded) return
     val bookmarks = BookmarkStore.getBookmarks(prefs)
     val summary = if (bookmarks.isEmpty()) {
       getString(R.string.bookmark_empty_list)
@@ -111,13 +112,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
     viewLifecycleOwner.lifecycleScope.launch {
       try {
         val release = withContext(Dispatchers.IO) { UpdateApi.fetchLatestRelease() }
+        if (!isAdded) return@launch
         latestRelease = release
         updatePref?.summary = buildUpdateSummary(release)
       } catch (_: Exception) {
+        if (!isAdded) return@launch
         updatePref?.summary = getString(R.string.update_summary_error)
       } finally {
-        isCheckingUpdate = false
-        refreshUpdatePreferenceState()
+        if (isAdded) {
+          isCheckingUpdate = false
+          refreshUpdatePreferenceState()
+        }
       }
     }
   }
@@ -127,31 +132,38 @@ class SettingsFragment : PreferenceFragmentCompat() {
     isDownloadingUpdate = true
     refreshUpdatePreferenceState()
     updatePref?.summary = getString(R.string.update_summary_downloading, release.versionName)
-    Toast.makeText(requireContext(), R.string.update_download_start, Toast.LENGTH_LONG).show()
+    if (isAdded) {
+      Toast.makeText(requireContext(), R.string.update_download_start, Toast.LENGTH_LONG).show()
+    }
 
     viewLifecycleOwner.lifecycleScope.launch {
       try {
         val apkFile = withContext(Dispatchers.IO) {
           UpdateInstaller.downloadApk(requireContext().applicationContext, downloadUrl, release.assetName)
         }
+        if (!isAdded) return@launch
         Toast.makeText(requireContext(), R.string.update_download_complete, Toast.LENGTH_LONG).show()
         val launched = UpdateInstaller.launchInstallIntent(requireContext(), apkFile)
-        if (!launched) {
+        if (!launched && isAdded) {
           Toast.makeText(requireContext(), R.string.update_permission_required, Toast.LENGTH_LONG).show()
         }
         updatePref?.summary = buildUpdateSummary(release)
       } catch (e: Exception) {
+        if (!isAdded) return@launch
         val message = e.localizedMessage ?: e.javaClass.simpleName
         Toast.makeText(requireContext(), getString(R.string.update_download_failed, message), Toast.LENGTH_LONG).show()
         updatePref?.summary = getString(R.string.update_summary_error)
       } finally {
-        isDownloadingUpdate = false
-        refreshUpdatePreferenceState()
+        if (isAdded) {
+          isDownloadingUpdate = false
+          refreshUpdatePreferenceState()
+        }
       }
     }
   }
 
   private fun buildUpdateSummary(release: ReleaseInfo?): String {
+    if (!isAdded) return ""
     val current = currentVersion()
     return when {
       release == null -> getString(R.string.update_summary_error)
